@@ -3,14 +3,17 @@ import boto3
 import botocore
 import os
 import hashlib
+import json
+from pathlib import Path
+import re
 
 # S3 config
+BATCH_PREFIX = 'batch'
+INFO_FN = "info.json"
 os.environ["AWS_SHARED_CREDENTIALS_FILE"] = "~/.aws/credentials"
-ARCHIVE_BUCKET = "archive.tbrc.org"
 OCR_OUTPUT_BUCKET = "ocr.bdrc.io"
 S3 = boto3.resource("s3")
 S3_client = boto3.client("s3")
-archive_bucket = S3.Bucket(ARCHIVE_BUCKET)
 ocr_output_bucket = S3.Bucket(OCR_OUTPUT_BUCKET)
 
 def read_csv(path):
@@ -43,9 +46,54 @@ def get_s3_prefix_path(
         for dt in data_types:
             paths[dt] = f"{batch_dir}/{dt}/{work_local_id}-{suffix}"
         return paths
-    return f"{base_dir}/images/{work_local_id}-{suffix}"
+    return f"s3://ocr.bdrc.io/{base_dir}/norbuketaka/batch-0001"
+
+def get_info_json():
+    info_json = {
+   "timestamp": "2022-08-25T00:00:00Z"
+}
+    return info_json
+
+def archive_on_s3(s3_path,csv_file:Path):
+    info_json=get_info_json()
+    csv_content = csv_file.read_text(encoding="utf-8")
+    s3_ocr_info_path = f"{s3_path}/{INFO_FN}"
+    s3_ocr_csv_path = f"{s3_path}/{csv_file.stem}.csv"
+    ocr_output_bucket.put_object(
+        Key=s3_ocr_info_path, Body=(bytes(json.dumps(info_json).encode("UTF-8")))
+    )
+    ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content)
+    print(s3_ocr_csv_path)
+    print(s3_ocr_info_path)
+
+def get_csvFiles(dir):
+    csv_files = [path for path in Path(dir).iterdir()]
+    return csv_files
+
+def extract_ids(str):
+    x = re.match("(.*)-(.*)",str)
+    work_id = x.group(1)
+    image_group_id = x.group(2)
+    return work_id,image_group_id
+    
+
+def main(csv_file:Path):
+    work_id,image_group_id = extract_ids(csv_file.stem)
+    s3_prefix = get_s3_prefix_path(work_id,image_group_id)
+    archive_on_s3(s3_prefix,csv_file)
 
 
 if __name__ == "__main__":
-    df = read_csv("sample.csv")
+    #df = read_csv("sample.csv")
+    #prefix = get_s3_prefix_path("W1K2118","I1K2126")
+    #archive_on_s3(prefix)
+    #S3_client.download_file(OCR_OUTPUT_BUCKET,f"s3://ocr.bdrc.io/Works/37/W4CZ1042/norbuketaka/batch-0001/info.json","demo.json")
+    #S3_client.download_file(OCR_OUTPUT_BUCKET,f"s3://ocr.bdrc.io/Works/37/W4CZ1042/norbuketaka/batch-0001/W4CZ1042-I1PD108815.csv","demo.csv")
+
+    files = get_csvFiles("08152022_queenieluo")
+    for file in files:
+        main(file)
+        print(file)
+
+    
     
