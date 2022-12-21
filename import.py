@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import requests
 
 # S3 config
 BATCH_PREFIX = 'batch'
@@ -82,6 +83,36 @@ def main(csv_file:Path):
     s3_prefix = get_s3_prefix_path(work_id,image_group_id)
     archive_on_s3(s3_prefix,csv_file)
 
+
+def get_volume_infos(work_prefix_url):
+    """
+    the input is something like bdr:W22084, the output is a list like:
+    [
+      {
+        "vol_num": 1,
+        "volume_prefix_url": "bdr:V22084_I0886",
+        "imagegroup": "I0886"
+      },
+      ...
+    ]
+    """
+    r = requests.get(
+        f"http://purl.bdrc.io/query/table/volumesForWork?R_RES={work_prefix_url}&format=json&pageSize=500"
+    )
+    if r.status_code != 200:
+        logger.error(
+            f"Volume Info Error: No info found for Work {work_prefix_url}: status code: {r.status_code}"
+        )
+        return
+    # the result of the query is already in ascending volume order
+    res = r.json()
+    for b in res["results"]["bindings"]:
+        volume_prefix_url = NSM.qname(URIRef(b["volid"]["value"]))
+        yield {
+            "vol_num": get_value(b["volnum"]),
+            "volume_prefix_url": volume_prefix_url,
+            "imagegroup": volume_prefix_url[4:],
+        }
 
 if __name__ == "__main__":
     #df = read_csv("sample.csv")
