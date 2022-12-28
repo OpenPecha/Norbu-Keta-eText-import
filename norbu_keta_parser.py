@@ -3,13 +3,14 @@ import pandas as pd
 from openpecha.buda.api import get_buda_scan_info
 from openpecha.core.pecha import OpenPechaFS
 from openpecha.core.layer import Layer, LayerEnum
-from openpecha.core.annotation import AnnBase, Span
+from openpecha.core.annotation import AnnBase, Span,Page
 from uuid import uuid4
 from openpecha.core.ids import get_initial_pecha_id,get_base_id
 from openpecha.core.metadata import InitialPechaMetadata,InitialCreationType
-
+from openpecha.buda.api import get_buda_scan_info,get_image_list
 from pathlib import Path
 from openpecha import config
+import re
 
 
 
@@ -17,6 +18,7 @@ class csvFormatter(BaseFormatter):
     col_headers = ["work_id","image_group_id","text","image_name","line_number"]
 
     def __init__(self,output_path=None,metadata=None,csv_file:str=None):
+        self.buda_il = {}
         super().__init__(output_path,metadata)
         if csv_file:
             self.csv_df = self.read_csv()
@@ -35,21 +37,41 @@ class csvFormatter(BaseFormatter):
         self.csv_df = self.csv_df.sort_values(col_priority_order)
 
 
-    def get_segment_layer(self):
-        segment_annotations = {}
+    def get_pagination_layer(self):
+        page_annotations = {}
         char_walker=0
         for index,row in self.csv_df.iterrows():
-            segment_annotation,char_walker= self.get_segment_annotation(row,char_walker)
-            segment_annotations.update(segment_annotation)
-        segment_layer = Layer(annotation_type=LayerEnum.segment,annotations=segment_annotations)
+            page_annotation,char_walker= self.get_page_annotation(row,char_walker)
+            page_annotations.update(page_annotation)
+        segment_layer = Layer(annotation_type=LayerEnum.pagination,annotations=page_annotations)
         return segment_layer
     
-    def get_segment_annotation(self,row,char_walker):
+    def get_page_annotation(self,row,char_walker):
         start = char_walker
+        res = self.get_image_meta(row)
+        image_number,image_filename = res
+
         end = char_walker + len(row["text"])
-        meta_data = {"work_id":row["work_id"],"image_group_id":row["image_group_id"],"image_name":row["image_name"]}
-        segment_annotation = {uuid4().hex:AnnBase(span=Span(start=start,end=end),metadata=meta_data)}
-        return segment_annotation,end+1
+        meta_data = {"work_id":row["work_id"],"image_group_id":row["image_group_id"]}
+        page_annotation = {uuid4().hex:Page(span=Span(start=start,end=end),metadata=meta_data,imgnum=image_number,reference=image_filename)}
+        return page_annotation,end+1
+
+    def get_image_meta(self,row):
+        work_id = row["work_id"]
+        image_group_id = row["image_group_id"]
+        if (work_id,image_group_id) not in self.buda_il.keys():
+            res = get_image_list(work_id, image_group_id)
+            print("getting image meta")
+            self.buda_il.update({(work_id,image_group_id):res})
+            buda_il = res
+        else:
+            buda_il = self.buda_il[(work_id,image_group_id)]
+
+        for image_number, image_filename in enumerate(map(lambda ii: ii["filename"], buda_il)):
+            ex = re.match("(.*)\..*",image_filename)
+            if ex.group(1) == row["image_name"]:
+                return image_number,image_filename 
+        return 
 
     def get_work_metadata(self,work_id):
         res = get_buda_scan_info(work_id)
@@ -69,7 +91,8 @@ class csvFormatter(BaseFormatter):
             bases = {
                 base_id:{
                     "title":title,
-                    "languages":langs,
+                    "description":"The proofread texts are donated by the Norbu Ketaka project led by Queenie Luo (Harvard University), Zhiying Li (Sichuan University) and Leonard van der Kuijp (Harvard University). Correspondence should be directed to  queenieluo@g.harvard.edu .",
+                    "language":langs,
                     "author":author,
                     "base_file":f"{base_id}.txt",
                     "order":1
@@ -93,13 +116,13 @@ class csvFormatter(BaseFormatter):
             self.order_df(col_priority_order)
 
         base_text = self.get_base_text()
-        segment_layer = self.get_segment_layer()
+        pagination_layer = self.get_pagination_layer()
         pecha_id = get_initial_pecha_id()
         opf_path = f"opfs/{pecha_id}/{pecha_id}.opf"
         opf = OpenPechaFS(path=opf_path)
         base_id = get_base_id()
         opf.bases = {base_id:base_text}
-        opf.layers = {base_id:{LayerEnum.segment:segment_layer}}
+        opf.layers = {base_id:{LayerEnum.pagination:pagination_layer}}
         opf._meta = self.get_meta(pecha_id,base_id)
         opf.save_base()
         opf.save_layers()
@@ -131,11 +154,3 @@ if __name__ == "__main__":
         obj.create_opf(csv_file=mod_csv_path,col_priority_order=col_priority)
         break
     
-
-
-
-
-
-
-
-   

@@ -7,10 +7,10 @@ import json
 from pathlib import Path
 import re
 import requests
+from openpecha.buda.api import get_buda_scan_info,get_image_list
 
 # S3 config
 BATCH_PREFIX = 'batch'
-INFO_FN = "info.json"
 os.environ["AWS_SHARED_CREDENTIALS_FILE"] = "~/.aws/credentials"
 OCR_OUTPUT_BUCKET = "ocr.bdrc.io"
 S3 = boto3.resource("s3")
@@ -18,8 +18,8 @@ S3_client = boto3.client("s3")
 ocr_output_bucket = S3.Bucket(OCR_OUTPUT_BUCKET)
 
 def read_csv(path):
-    df = pd.read_csv(path,header=None)
-    df = df.sort_values([3,2])
+    df = pd.read_csv(path)
+    df = df.sort_values(["row_number","page_ID"])
     return df
 
 def get_s3_prefix_path(
@@ -84,35 +84,14 @@ def main(csv_file:Path):
     archive_on_s3(s3_prefix,csv_file)
 
 
-def get_volume_infos(work_prefix_url):
-    """
-    the input is something like bdr:W22084, the output is a list like:
-    [
-      {
-        "vol_num": 1,
-        "volume_prefix_url": "bdr:V22084_I0886",
-        "imagegroup": "I0886"
-      },
-      ...
-    ]
-    """
-    r = requests.get(
-        f"http://purl.bdrc.io/query/table/volumesForWork?R_RES={work_prefix_url}&format=json&pageSize=500"
-    )
-    if r.status_code != 200:
-        logger.error(
-            f"Volume Info Error: No info found for Work {work_prefix_url}: status code: {r.status_code}"
-        )
-        return
-    # the result of the query is already in ascending volume order
-    res = r.json()
-    for b in res["results"]["bindings"]:
-        volume_prefix_url = NSM.qname(URIRef(b["volid"]["value"]))
-        yield {
-            "vol_num": get_value(b["volnum"]),
-            "volume_prefix_url": volume_prefix_url,
-            "imagegroup": volume_prefix_url[4:],
-        }
+def extract_meta():
+    res = get_image_list("W00EGS1016761","I01JW66")
+    print(res)
+
+def get_image(bdrc_scan_id,image_group_id):
+        buda_il = get_image_list(bdrc_scan_id, image_group_id)
+        # format should be a list of image_id (/ file names)
+        return map(lambda ii: ii["filename"], buda_il)
 
 if __name__ == "__main__":
     #df = read_csv("sample.csv")
@@ -120,11 +99,10 @@ if __name__ == "__main__":
     #archive_on_s3(prefix)
     #S3_client.download_file(OCR_OUTPUT_BUCKET,f"s3://ocr.bdrc.io/Works/37/W4CZ1042/norbuketaka/batch-0001/info.json","demo.json")
     #S3_client.download_file(OCR_OUTPUT_BUCKET,f"s3://ocr.bdrc.io/Works/37/W4CZ1042/norbuketaka/batch-0001/W4CZ1042-I1PD108815.csv","demo.csv")
-
-    files = get_csvFiles("08152022_queenieluo")
-    for file in files:
-        main(file)
-        print(file)
-
-    
+    #extract_meta()
+    #df = read_csv("08152022_queenieluo/W00EGS1016761-I01JW66.csv")
+    #df.to_csv("new.csv")
+    image_list = get_image("W00EGS1016761","I01JW66")
+    for image_number, image_filename in enumerate(image_list):
+        print(image_number,image_filename)
     
