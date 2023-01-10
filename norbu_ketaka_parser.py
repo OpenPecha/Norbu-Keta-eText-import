@@ -1,6 +1,5 @@
 from openpecha.formatters import BaseFormatter
 import pandas as pd
-from openpecha.buda.api import get_buda_scan_info
 from openpecha.core.pecha import OpenPechaFS
 from openpecha.core.layer import Layer, LayerEnum
 from openpecha.core.annotation import AnnBase, Span,Page
@@ -11,6 +10,7 @@ from openpecha.buda.api import get_buda_scan_info,get_image_list
 from pathlib import Path
 from openpecha import config
 import re
+from pydantic import parse_obj_as,AnyHttpUrl
 
 
 
@@ -29,7 +29,9 @@ class csvFormatter(BaseFormatter):
         dfs = df.groupby("work_id")
         keys = list(dfs.groups)
         for key in keys:
-            splitted_dfs.append(dfs.get_group(key))
+            df = dfs.get_group(key)
+            cleaned_df = df.dropna(how="all")
+            splitted_dfs.append(cleaned_df)
         return splitted_dfs
 
     def get_base_text(self):
@@ -83,6 +85,7 @@ class csvFormatter(BaseFormatter):
     def get_meta(self,pecha_id,base_id):
         index,row = list(self.csv_df.iterrows())[0]
         work_id = row["work_id"]
+        parser = """https://github.com/OpenPecha/Toolkit/blob/7f57883d84bc10351527a49ee6ce970ace404e50/openpecha/formatters/google_ocr.py"""
         res = self.get_work_metadata(work_id)
         title = res["source_metadata"]["title"]
         langs = res["source_metadata"]["languages"]
@@ -92,21 +95,52 @@ class csvFormatter(BaseFormatter):
             author=None
         meta = InitialPechaMetadata(
             id = pecha_id,
-            source = "Norbu Ketaka etexts",
+            ocr_import_info={
+                "bdrc_scan_id":work_id,
+                "source":"bdrc",
+                "ocr_info":{
+                    "timestamp":"2022-08-25T00:00:00Z"
+                },
+                "batch_id":"batch001",
+                "software_id":"norbuketatka",
+                "expected_default_language":"bo",
+                "op_import_options":None,
+                "op_import_versio":"1.0.0"
+            },
+            default_language="bo",
+            source = "https://library.bdrc.io",
+            source_file=None,
             initial_creation_type=InitialCreationType.ocr,
-            source_file="http://eroux.fr/08152022_queenieluo.zip",
+            imported="2022-08-31T09:26:20.614553+00:00",
+            last_modified="2022-08-25T00:00:00Z",
+            parser= parser,
             source_metadata={
-                "description":"The proofread texts are donated by the Norbu Ketaka project led by Queenie Luo (Harvard University), Zhiying Li (Sichuan University) and Leonard van der Kuijp (Harvard University). Correspondence should be directed to  queenieluo@g.harvard.edu .",
-                "language":langs,
+                "id":f"http://purl.bdrc.io/resource/{work_id}",
+                "status": "http://purl.bdrc.io/admindata/StatusReleased",
+                "access": "http://purl.bdrc.io/admindata/AccessOpen",
+                "reproduction_of": "http://purl.bdrc.io/resource/MW3PD1002",
+                "copyright_status": "http://purl.bdrc.io/resource/CopyrightClaimed",
+                "title":title,
                 "author":author,
             },
+            quality=None,
             bases = {
                 base_id:{
-                    "title":title,
+                    "source_metadata":{
+                        "id":f"http://purl.bdrc.io/resource/{work_id}",
+                        "total_pages":res["image_groups"][base_id]["total_pages"],
+                        "volume_number":res["image_groups"][base_id]["volume_number"],
+                        "volume_pages_bdrc_intro":res["image_groups"][base_id]["volume_pages_bdrc_intro"]
+                    },
                     "base_file":f"{base_id}.txt",
                     "order":1
                 }
-            }
+            },
+            copyright={
+                "status":"Public domain",
+                "notice":"""The proofread texts are donated by the Norbu Ketaka project led by Queenie Luo (Harvard University), Zhiying Li (Sichuan University) and Leonard van der Kuijp (Harvard University). Correspondence should be directed to  queenieluo@g.harvard.edu"""
+            },
+            license="CC0"
         )
         return meta
 
@@ -136,7 +170,7 @@ class csvFormatter(BaseFormatter):
             opf.save_base()
             opf.save_layers()
             opf.save_meta()
-        return opf.opf_path
+
 
     def get_base_id(self):
         image_group_names = self.csv_df["image_group_id"].unique()
@@ -163,6 +197,7 @@ def update_csv_hearders(csv_file):
 if __name__ == "__main__":
     obj = csvFormatter()
     csv_files = get_csvFiles("08152022_queenieluo")
+    #csv_files = ["08152022_queenieluo/W3PD1002-I1KG81129.csv"]
     col_priority = ["line_number","image_name"]
     for csv_file in csv_files:
         mod_csv_path = update_csv_hearders(csv_file)  
