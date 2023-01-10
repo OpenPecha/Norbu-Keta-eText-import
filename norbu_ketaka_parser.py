@@ -24,15 +24,9 @@ class csvFormatter(BaseFormatter):
             self.csv_df = self.read_csv()
 
     def read_csv(self,path):
-        splitted_dfs = []
-        df = pd.read_csv(path)
-        dfs = df.groupby("work_id")
-        keys = list(dfs.groups)
-        for key in keys:
-            df = dfs.get_group(key)
-            cleaned_df = df.dropna(how="all")
-            splitted_dfs.append(cleaned_df)
-        return splitted_dfs
+        mod_csv_path = update_csv_hearders(path)  
+        df = pd.read_csv(mod_csv_path)
+        return df
 
     def get_base_text(self):
         base_text = ""
@@ -82,13 +76,27 @@ class csvFormatter(BaseFormatter):
         res = get_buda_scan_info(work_id)
         return res
 
-    def get_meta(self,pecha_id,base_id):
+    def get_meta(self,pecha_id,base_ids):
+        bases = {}
+        order = 1
         index,row = list(self.csv_df.iterrows())[0]
         work_id = row["work_id"]
-        parser = """https://github.com/OpenPecha/Toolkit/blob/7f57883d84bc10351527a49ee6ce970ace404e50/openpecha/formatters/google_ocr.py"""
+        parser = """https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"""
         res = self.get_work_metadata(work_id)
         title = res["source_metadata"]["title"]
-        langs = res["source_metadata"]["languages"]
+        for base_id in base_ids:
+            bases.update({base_id:{
+                    "source_metadata":{
+                        "id":f"http://purl.bdrc.io/resource/{work_id}",
+                        "total_pages":res["image_groups"][base_id]["total_pages"],
+                        "volume_number":res["image_groups"][base_id]["volume_number"],
+                        "volume_pages_bdrc_intro":res["image_groups"][base_id]["volume_pages_bdrc_intro"]
+                    },
+                    "base_file":f"{base_id}.txt",
+                    "order":order
+                }})
+            order+=1
+
         if "author" in  res["source_metadata"].keys():
             author= res["source_metadata"]["author"]
         else:
@@ -118,24 +126,13 @@ class csvFormatter(BaseFormatter):
                 "id":f"http://purl.bdrc.io/resource/{work_id}",
                 "status": "http://purl.bdrc.io/admindata/StatusReleased",
                 "access": "http://purl.bdrc.io/admindata/AccessOpen",
-                "reproduction_of": "http://purl.bdrc.io/resource/MW3PD1002",
+                "reproduction_of": f"http://purl.bdrc.io/resource/M{work_id}",
                 "copyright_status": "http://purl.bdrc.io/resource/CopyrightClaimed",
                 "title":title,
                 "author":author,
             },
             quality=None,
-            bases = {
-                base_id:{
-                    "source_metadata":{
-                        "id":f"http://purl.bdrc.io/resource/{work_id}",
-                        "total_pages":res["image_groups"][base_id]["total_pages"],
-                        "volume_number":res["image_groups"][base_id]["volume_number"],
-                        "volume_pages_bdrc_intro":res["image_groups"][base_id]["volume_pages_bdrc_intro"]
-                    },
-                    "base_file":f"{base_id}.txt",
-                    "order":1
-                }
-            },
+            bases = bases,
             copyright={
                 "status":"Public domain",
                 "notice":"""The proofread texts are donated by the Norbu Ketaka project led by Queenie Luo (Harvard University), Zhiying Li (Sichuan University) and Leonard van der Kuijp (Harvard University). Correspondence should be directed to  queenieluo@g.harvard.edu"""
@@ -145,7 +142,7 @@ class csvFormatter(BaseFormatter):
         return meta
 
     
-    def create_opf(self,csv_file:str,col_priority_order:list=None):
+    def create_opf(self,csv_files:list,col_priority_order:list=None):
         """
         Paramneters:
         csv_file: str
@@ -153,23 +150,25 @@ class csvFormatter(BaseFormatter):
         col_priority_order: list
             list of col to priotize in descending order priority
         """
-        self.csv_dfs = self.read_csv(csv_file)
-        
-        for self.csv_df in self.csv_dfs:
+        pecha_id = get_initial_pecha_id()
+        opf_path = f"opfs/{pecha_id}/{pecha_id}.opf"
+        opf = OpenPechaFS(path=opf_path)
+        base_ids = []
+
+        for csv_file in csv_files:
+            self.csv_df = self.read_csv(csv_file)
             if col_priority_order:
                 self.order_df(col_priority_order)
             base_text = self.get_base_text()
             pagination_layer = self.get_pagination_layer()
-            pecha_id = get_initial_pecha_id()
-            opf_path = f"opfs/{pecha_id}/{pecha_id}.opf"
-            opf = OpenPechaFS(path=opf_path)
             base_id = self.get_base_id()
-            opf.bases = {base_id:base_text}
-            opf.layers = {base_id:{LayerEnum.pagination:pagination_layer}}
-            opf._meta = self.get_meta(pecha_id,base_id)
-            opf.save_base()
-            opf.save_layers()
-            opf.save_meta()
+            opf.bases.update({base_id:base_text})
+            opf.layers.update({base_id:{LayerEnum.pagination:pagination_layer}})
+            base_ids.append(base_id)
+        opf._meta = self.get_meta(pecha_id,base_ids)
+        opf.save_base()
+        opf.save_layers()
+        opf.save_meta()
 
 
     def get_base_id(self):
@@ -179,8 +178,21 @@ class csvFormatter(BaseFormatter):
         return image_group_names[0]
 
 def get_csvFiles(dir):
-    csv_files = [path for path in Path(dir).iterdir()]
-    return csv_files
+    searched_works = set()
+    files = {}
+    for path in Path(dir).iterdir():
+        x = re.match("(.*)-(.*)",path.stem)
+        work = x.group(1)
+        file = []
+        if work in searched_works:
+            continue
+        for path_in in Path(dir).iterdir():
+            if work in path_in.stem:
+                file.append(path_in.as_posix())
+        files[work] = file
+        searched_works.add(work)
+
+    return files
 
 def update_csv_hearders(csv_file):
     df = pd.read_csv(csv_file)
@@ -197,10 +209,9 @@ def update_csv_hearders(csv_file):
 if __name__ == "__main__":
     obj = csvFormatter()
     csv_files = get_csvFiles("08152022_queenieluo")
-    #csv_files = ["08152022_queenieluo/W3PD1002-I1KG81129.csv"]
+    #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
     col_priority = ["line_number","image_name"]
-    for csv_file in csv_files:
-        mod_csv_path = update_csv_hearders(csv_file)  
-        obj.create_opf(csv_file=mod_csv_path,col_priority_order=col_priority)
+    for work in csv_files.keys():
+        obj.create_opf(csv_files=csv_files[work],col_priority_order=col_priority)
         break
     
