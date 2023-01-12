@@ -9,8 +9,9 @@ from openpecha.core.metadata import InitialPechaMetadata,InitialCreationType
 from openpecha.buda.api import get_buda_scan_info,get_image_list
 from pathlib import Path
 from openpecha import config
+from openpecha import github_utils
+import os
 import re
-from pydantic import parse_obj_as,AnyHttpUrl
 
 
 
@@ -83,11 +84,10 @@ class csvFormatter(BaseFormatter):
         work_id = row["work_id"]
         parser = """https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"""
         res = self.get_work_metadata(work_id)
-        title = res["source_metadata"]["title"]
         for base_id in base_ids:
             bases.update({base_id:{
                     "source_metadata":{
-                        "id":f"http://purl.bdrc.io/resource/{work_id}",
+                        "id":f"http://purl.bdrc.io/resource/{base_id}",
                         "total_pages":res["image_groups"][base_id]["total_pages"],
                         "volume_number":res["image_groups"][base_id]["volume_number"],
                         "volume_pages_bdrc_intro":res["image_groups"][base_id]["volume_pages_bdrc_intro"]
@@ -97,10 +97,6 @@ class csvFormatter(BaseFormatter):
                 }})
             order+=1
 
-        if "author" in  res["source_metadata"].keys():
-            author= res["source_metadata"]["author"]
-        else:
-            author=None
         meta = InitialPechaMetadata(
             id = pecha_id,
             ocr_import_info={
@@ -122,15 +118,7 @@ class csvFormatter(BaseFormatter):
             imported="2022-08-31T09:26:20.614553+00:00",
             last_modified="2022-08-25T00:00:00Z",
             parser= parser,
-            source_metadata={
-                "id":f"http://purl.bdrc.io/resource/{work_id}",
-                "status": "http://purl.bdrc.io/admindata/StatusReleased",
-                "access": "http://purl.bdrc.io/admindata/AccessOpen",
-                "reproduction_of": f"http://purl.bdrc.io/resource/M{work_id}",
-                "copyright_status": "http://purl.bdrc.io/resource/CopyrightClaimed",
-                "title":title,
-                "author":author,
-            },
+            source_metadata=res["source_metadata"],
             quality=None,
             bases = bases,
             copyright={
@@ -169,6 +157,7 @@ class csvFormatter(BaseFormatter):
         opf.save_base()
         opf.save_layers()
         opf.save_meta()
+        return opf
 
 
     def get_base_id(self):
@@ -206,12 +195,40 @@ def update_csv_hearders(csv_file):
     correct_df.to_csv(mod_csv_path, index=False,header=True)
     return mod_csv_path
 
+def publish_repo(pecha_path, asset_paths=None,private=False):
+    github_utils.github_publish(
+        pecha_path,
+        message="initial commit",
+        not_includes=[],
+        layers=[],
+        org=os.environ.get("OPENPECHA_DATA_GITHUB_ORG"),
+        token=os.environ.get("GITHUB_TOKEN"),
+        private=private
+       )
+    if asset_paths:
+        repo_name = pecha_path.stem
+        #asset_name = asset_path.stem
+        #shutil.make_archive(asset_path.parent / asset_name, "zip", asset_path)
+        #asset_paths.append(f"{asset_path.parent / asset_name}.zip")
+        github_utils.create_release(
+            repo_name,
+            prerelease=False,
+            asset_paths=asset_paths, 
+            org=os.environ.get("OPENPECHA_DATA_GITHUB_ORG"),
+            token=os.environ.get("GITHUB_TOKEN")
+        )
+
 if __name__ == "__main__":
     obj = csvFormatter()
     csv_files = get_csvFiles("08152022_queenieluo")
     #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
     col_priority = ["line_number","image_name"]
     for work in csv_files.keys():
-        obj.create_opf(csv_files=csv_files[work],col_priority_order=col_priority)
+        opf = obj.create_opf(csv_files=csv_files[work],col_priority_order=col_priority)
+        if opf.is_private:
+            print("repo is private")
+            publish_repo(pecha_path=opf.opf_path,private=True)
+        else:
+            print("repo is public")
+            publish_repo(pecha_path=opf.opf_path,private=False)
         break
-    
