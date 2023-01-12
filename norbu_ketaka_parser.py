@@ -12,6 +12,7 @@ from openpecha import config
 from openpecha import github_utils
 import os
 import re
+import datetime
 
 
 
@@ -115,7 +116,7 @@ class csvFormatter(BaseFormatter):
             source = "https://library.bdrc.io",
             source_file=None,
             initial_creation_type=InitialCreationType.ocr,
-            imported="2022-08-31T09:26:20.614553+00:00",
+            imported=datetime.datetime.now(),
             last_modified="2022-08-25T00:00:00Z",
             parser= parser,
             source_metadata=res["source_metadata"],
