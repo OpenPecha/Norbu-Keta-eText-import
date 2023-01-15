@@ -12,7 +12,9 @@ from openpecha import config
 from openpecha import github_utils
 import os
 import re
+import logging
 import datetime
+import shutil
 
 
 
@@ -128,6 +130,7 @@ class csvFormatter(BaseFormatter):
             },
             license="CC0"
         )
+        self.title = res["source_metadata"]["title"]
         return meta
 
     
@@ -197,7 +200,7 @@ def update_csv_hearders(csv_file):
     return mod_csv_path
 
 def publish_repo(pecha_path, asset_paths=None,private=False):
-    github_utils.github_publish(
+    repo = github_utils.github_publish(
         pecha_path,
         message="initial commit",
         not_includes=[],
@@ -207,6 +210,7 @@ def publish_repo(pecha_path, asset_paths=None,private=False):
         private=private
        )
     if asset_paths:
+        zipped_dir = create_zip_dir(asset_paths)
         repo_name = pecha_path.stem
         #asset_name = asset_path.stem
         #shutil.make_archive(asset_path.parent / asset_name, "zip", asset_path)
@@ -214,22 +218,51 @@ def publish_repo(pecha_path, asset_paths=None,private=False):
         github_utils.create_release(
             repo_name,
             prerelease=False,
-            asset_paths=asset_paths, 
+            asset_paths=[zipped_dir], 
             org=os.environ.get("OPENPECHA_DATA_GITHUB_ORG"),
-            token=os.environ.get("GITHUB_TOKEN")
+            token=os.environ.get("GITHUB_TOKEN"),repo = repo
         )
+        os.remove("source.zip")
 
-if __name__ == "__main__":
+def create_zip_dir(paths:Path):
+    os.makedirs("./source_files")
+    for path in paths:
+        shutil.copy(path.as_posix(),"./source_files")
+    shutil.make_archive("source",'zip',"./source_files")
+    shutil.rmtree("./source_files")
+    return Path("source.zip")
+
+
+
+def set_up_logger(logger_name):
+    logger = logging.getLogger(logger_name)
+    formatter = logging.Formatter("%(message)s")
+    fileHandler = logging.FileHandler(f"{logger_name}.log")
+    fileHandler.setFormatter(formatter)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(fileHandler)
+    return logger
+
+
+def main():
+    pechas_catalog = set_up_logger("pechas_catalog")
     obj = csvFormatter()
     csv_files = get_csvFiles("08152022_queenieluo")
     #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
     col_priority = ["line_number","image_name"]
-    for work in csv_files.keys():
-        opf = obj.create_opf(csv_files=csv_files[work],col_priority_order=col_priority)
+    for work_id in csv_files.keys():
+        opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
+        assets = [Path(path) for path in csv_files[work_id]]
         if opf.is_private:
             print("repo is private")
-            publish_repo(pecha_path=opf.opf_path,private=True)
+            publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
         else:
             print("repo is public")
-            publish_repo(pecha_path=opf.opf_path,private=False)
+            publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
+        pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
         break
+
+
+if __name__ == "__main__":
+    main()
+    
