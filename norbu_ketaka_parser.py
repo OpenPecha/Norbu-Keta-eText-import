@@ -35,7 +35,7 @@ class csvFormatter(BaseFormatter):
     def get_base_text(self):
         base_text = ""
         for index,row in self.csv_df.iterrows():
-            base_text+=row["text"]+"\n"
+            base_text+=row["text"]+"\n\n"
         return base_text
 
     def order_df(self,col_priority_order):
@@ -57,7 +57,7 @@ class csvFormatter(BaseFormatter):
         image_number,image_filename = res
         end = char_walker + len(row["text"])
         page_annotation = {uuid4().hex:Page(span=Span(start=start,end=end),imgnum=image_number,reference=image_filename)}
-        return page_annotation,end+1
+        return page_annotation,end+2
 
     def get_image_meta(self,row):
         work_id = row["work_id"]
