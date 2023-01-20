@@ -32,31 +32,42 @@ class csvFormatter(BaseFormatter):
         df = pd.read_csv(mod_csv_path)
         return df
 
-    def get_base_text(self):
+    def get_base_text(self, pages):
         base_text = ""
-        for index,row in self.csv_df.iterrows():
-            base_text+=row["text"]+"\n\n"
+        for image_name,page in pages.items():
+            base_text+=page+"\n"
         return base_text
 
     def order_df(self,col_priority_order):
         self.csv_df = self.csv_df.sort_values(col_priority_order)
 
+    def get_pages(self):
+        pages = {}
+        cur_page_id = self.csv_df.iloc[0]['image_name']
+        cur_page = ""
+        for _,row in self.csv_df.iterrows():
+            if row['image_name'] != cur_page_id:
+                pages[cur_page_id] = cur_page
+                cur_page = f"{row['text']}\n"
+                cur_page_id = row['image_name']
+            else:
+                cur_page += f"{row['text']}\n"
+        return pages
 
-    def get_pagination_layer(self):
+    def get_pagination_layer(self, pages):
         page_annotations = {}
         char_walker=0
-        for _,row in self.csv_df.iterrows():
-            page_annotation,char_walker= self.get_page_annotation(row,char_walker)
+        for image_name, page in pages.items():
+            page_annotation,char_walker= self.get_page_annotation(image_name, page, char_walker)
             page_annotations.update(page_annotation)
         segment_layer = Layer(annotation_type=LayerEnum.pagination,annotations=page_annotations)
         return segment_layer
     
-    def get_page_annotation(self,row,char_walker):
+    def get_page_annotation(self,image_name, page, char_walker):
         start = char_walker
-        res = self.get_image_meta(row)
-        image_number,image_filename = res
-        end = char_walker + len(row["text"])
-        page_annotation = {uuid4().hex:Page(span=Span(start=start,end=end),imgnum=image_number,reference=image_filename)}
+        image_number= int(image_name[-4:])
+        end = char_walker + len(page.strip())
+        page_annotation = {uuid4().hex:Page(span=Span(start=start,end=end),imgnum=image_number,reference=image_name)}
         return page_annotation,end+2
 
     def get_image_meta(self,row):
@@ -151,8 +162,9 @@ class csvFormatter(BaseFormatter):
             self.csv_df = self.read_csv(csv_file)
             if col_priority_order:
                 self.order_df(col_priority_order)
-            base_text = self.get_base_text()
-            pagination_layer = self.get_pagination_layer()
+            pages = self.get_pages()
+            base_text = self.get_base_text(pages)
+            pagination_layer = self.get_pagination_layer(pages)
             base_id = self.get_base_id()
             opf.bases.update({base_id:base_text})
             opf.layers.update({base_id:{LayerEnum.pagination:pagination_layer}})
@@ -249,7 +261,7 @@ def main():
     obj = csvFormatter()
     csv_files = get_csvFiles("08152022_queenieluo")
     #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
-    col_priority = ["line_number","image_name"]
+    col_priority = ["image_name", "line_number"]
     for work_id in csv_files.keys():
         opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
         assets = [Path(path) for path in csv_files[work_id]]
@@ -264,5 +276,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-    
+    # main()
+    formatter = csvFormatter()
+    csv_files = list(Path('./data/W4CZ1042').iterdir())
+    col_priority = ["image_name", "line_number"]
+    opf = formatter.create_opf(csv_files, col_priority_order=col_priority)
