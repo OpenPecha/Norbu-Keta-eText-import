@@ -34,37 +34,59 @@ class csvFormatter(BaseFormatter):
 
     def get_base_text(self):
         base_text = ""
+        prev_image_name = self.csv_df["image_name"].iloc[0]
         for index,row in self.csv_df.iterrows():
-            base_text+=row["text"]+"\n\n"
+            cur_image_name = row["image_name"]
+            if prev_image_name == cur_image_name:
+                base_text+=row["text"]+"\n"
+            else:
+                base_text+="\n"+row["text"]+"\n"
+            prev_image_name = cur_image_name
         return base_text
 
     def order_df(self,col_priority_order):
         self.csv_df = self.csv_df.sort_values(col_priority_order)
 
 
+
     def get_pagination_layer(self):
         page_annotations = {}
         char_walker=0
-        for _,row in self.csv_df.iterrows():
-            page_annotation,char_walker= self.get_page_annotation(row,char_walker)
+        grouped = self.csv_df.groupby("image_name")
+        for name,df in grouped:
+            page_annotation,char_walker= self.get_page_annotation(df,char_walker)
             page_annotations.update(page_annotation)
         segment_layer = Layer(annotation_type=LayerEnum.pagination,annotations=page_annotations)
         return segment_layer
     
-    def get_page_annotation(self,row,char_walker):
+    
+    def get_page_annotation(self,df,char_walker):
         start = char_walker
-        res = self.get_image_meta(row)
-        image_number,image_filename = res
-        end = char_walker + len(row["text"])
+        try:
+            res = self.get_image_meta(df)
+            image_number,image_filename = res
+        except:
+            image_number,image_filename = None,None
+
+        base_text = self.convert_text_list_to_string(df)
+        end = char_walker + len(base_text)
         page_annotation = {uuid4().hex:Page(span=Span(start=start,end=end),imgnum=image_number,reference=image_filename)}
         return page_annotation,end+2
 
-    def get_image_meta(self,row):
+
+    def convert_text_list_to_string(self,df):
+        base_text = ""
+        for _,row in df.iterrows():
+            base_text+=row["text"]+"\n"
+        return base_text[:-1]
+
+    def get_image_meta(self,df):
+        row = df.iloc[0]
         work_id = row["work_id"]
         image_group_id = row["image_group_id"]
+        image_name = str(row["image_name"])
         if (work_id,image_group_id) not in self.buda_il.keys():
             res = get_image_list(work_id, image_group_id)
-            print("getting image meta")
             self.buda_il.update({(work_id,image_group_id):res})
             buda_il = res
         else:
@@ -72,9 +94,9 @@ class csvFormatter(BaseFormatter):
 
         for image_number, image_filename in enumerate(map(lambda ii: ii["filename"], buda_il)):
             ex = re.match("(.*)\..*",image_filename)
-            if ex.group(1) == row["image_name"]:
-                return image_number,image_filename 
-        return 
+            if ex.group(1) == image_name:
+                return image_number+1,image_filename 
+
 
     def get_work_metadata(self,work_id):
         res = get_buda_scan_info(work_id)
@@ -83,22 +105,29 @@ class csvFormatter(BaseFormatter):
     def get_meta(self,pecha_id,base_ids):
         bases = {}
         order = 1
+        source_metadata = ""
+        self.title = ""
         index,row = list(self.csv_df.iterrows())[0]
         work_id = row["work_id"]
         parser = """https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"""
         res = self.get_work_metadata(work_id)
-        for base_id in base_ids:
-            bases.update({base_id:{
-                    "source_metadata":{
-                        "id":f"http://purl.bdrc.io/resource/{base_id}",
-                        "total_pages":res["image_groups"][base_id]["total_pages"],
-                        "volume_number":res["image_groups"][base_id]["volume_number"],
-                        "volume_pages_bdrc_intro":res["image_groups"][base_id]["volume_pages_bdrc_intro"]
-                    },
-                    "base_file":f"{base_id}.txt",
-                    "order":order
-                }})
-            order+=1
+        if res != None:  
+            source_metadata = res["source_metadata"] 
+            self.title = res["source_metadata"]["title"]
+
+            for base_id in base_ids:
+                bases.update({base_id:{
+                        "source_metadata":{
+                            "id":f"http://purl.bdrc.io/resource/{base_id}",
+                            "total_pages":res["image_groups"][base_id]["total_pages"],
+                            "volume_number":res["image_groups"][base_id]["volume_number"],
+                            "volume_pages_bdrc_intro":res["image_groups"][base_id]["volume_pages_bdrc_intro"]
+                        },
+                        "base_file":f"{base_id}.txt",
+                        "order":order
+                    }})
+                order+=1
+            
 
         meta = InitialPechaMetadata(
             id = pecha_id,
@@ -108,11 +137,10 @@ class csvFormatter(BaseFormatter):
                 "ocr_info":{
                     "timestamp":"2022-08-25T00:00:00Z"
                 },
-                "batch_id":"batch001",
-                "software_id":"norbuketatka",
+                "batch_id":"batch-0001",
+                "software_id":"norbuketaka",
                 "expected_default_language":"bo",
-                "op_import_options":None,
-                "op_import_versio":"1.0.0"
+                "op_import_options":None
             },
             default_language="bo",
             source = "https://library.bdrc.io",
@@ -121,7 +149,7 @@ class csvFormatter(BaseFormatter):
             imported=datetime.datetime.now(),
             last_modified="2022-08-25T00:00:00Z",
             parser= parser,
-            source_metadata=res["source_metadata"],
+            source_metadata=source_metadata,
             quality=None,
             bases = bases,
             copyright={
@@ -130,7 +158,6 @@ class csvFormatter(BaseFormatter):
             },
             license="CC0"
         )
-        self.title = res["source_metadata"]["title"]
         return meta
 
     
@@ -249,7 +276,7 @@ def main():
     obj = csvFormatter()
     csv_files = get_csvFiles("08152022_queenieluo")
     #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
-    col_priority = ["line_number","image_name"]
+    col_priority = ["image_name","line_number"]
     for work_id in csv_files.keys():
         opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
         assets = [Path(path) for path in csv_files[work_id]]
@@ -260,7 +287,6 @@ def main():
             print("repo is public")
             publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
         pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
-        break
 
 
 if __name__ == "__main__":
