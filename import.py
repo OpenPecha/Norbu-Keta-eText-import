@@ -5,6 +5,11 @@ import json
 from pathlib import Path
 import re
 from openpecha.buda.api import get_buda_scan_info,get_image_list
+import logging
+
+
+logging.basicConfig(level=logging.INFO,filename="url.log",format='%(message)s')
+
 
 # S3 config
 BATCH_PREFIX = 'batch'
@@ -57,10 +62,9 @@ def archive_on_s3(s3_path,csv_file:Path,file_name):
     csv_content = csv_file.read_text(encoding="utf-8")
     s3_ocr_info_path = f"{s3_path}/info.json"
     s3_ocr_csv_path = f"{s3_path}/{file_name}"
-    ocr_output_bucket.put_object(
-        Key=s3_ocr_info_path, Body=(bytes(json.dumps(info_json).encode("UTF-8")))
-    )
-    ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content)
+    #ocr_output_bucket.put_object(Key=s3_ocr_info_path, Body=(bytes(json.dumps(info_json).encode("UTF-8"))))
+    #ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content)
+    logging.info(s3_ocr_csv_path)
 
 def get_csvFiles(dir):
     csv_files = [path for path in Path(dir).iterdir()]
@@ -98,6 +102,7 @@ if __name__ == "__main__":
     csv_files = get_csvFiles(path)
     for csv_file in csv_files:
         main(csv_file)
+        print(csv_file)
 
     """ objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
     for file in objects:
