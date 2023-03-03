@@ -1,4 +1,3 @@
-import pandas as pd
 import boto3
 import os
 import hashlib
@@ -49,8 +48,8 @@ def get_s3_prefix_path(
 
 def get_info_json():
     info_json = {
-   "timestamp": "2022-08-25T00:00:00Z"
-}
+   "timestamp": "2023-02-01T00:00:00Z"
+    }
     return info_json
 
 def archive_on_s3(s3_path,csv_file:Path,file_name):
@@ -58,12 +57,10 @@ def archive_on_s3(s3_path,csv_file:Path,file_name):
     csv_content = csv_file.read_text(encoding="utf-8")
     s3_ocr_info_path = f"{s3_path}/info.json"
     s3_ocr_csv_path = f"{s3_path}/{file_name}"
-    """ ocr_output_bucket.put_object(
+    ocr_output_bucket.put_object(
         Key=s3_ocr_info_path, Body=(bytes(json.dumps(info_json).encode("UTF-8")))
     )
-    ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content) """
-    print(s3_ocr_csv_path)
-    print(s3_ocr_info_path)
+    ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content)
 
 def get_csvFiles(dir):
     csv_files = [path for path in Path(dir).iterdir()]
@@ -97,12 +94,12 @@ def delete_obj_from_bucket(file_name):
     print(res)
 
 if __name__ == "__main__":
-    """ path = "NorbuKetaka2"
+    path = "NorbuKetaka2"
     csv_files = get_csvFiles(path)
     for csv_file in csv_files:
-        main(csv_file) """
+        main(csv_file)
 
-    objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
+    """ objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
     for file in objects:
-        S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,f"{file.key}.csv")
+        S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,f"{file.key}.csv") """
     
