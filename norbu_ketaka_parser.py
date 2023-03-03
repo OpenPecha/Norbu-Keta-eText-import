@@ -175,6 +175,7 @@ class csvFormatter(BaseFormatter):
         base_ids = []
 
         for csv_file in csv_files:
+            print(csv_file)
             self.csv_df = self.read_csv(csv_file)
             if col_priority_order:
                 self.order_df(col_priority_order)
@@ -227,6 +228,7 @@ def update_csv_hearders(csv_file):
     return mod_csv_path
 
 def publish_repo(pecha_path, asset_paths=None,private=False):
+    return
     repo = github_utils.github_publish(
         pecha_path,
         message="initial commit",
@@ -278,6 +280,8 @@ def main():
     #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
     col_priority = ["image_name","line_number"]
     for work_id in csv_files.keys():
+        if work_id != "W1KG2118":
+            continue
         opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
         assets = [Path(path) for path in csv_files[work_id]]
         if opf.is_private:

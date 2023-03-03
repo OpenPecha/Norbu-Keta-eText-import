@@ -93,16 +93,31 @@ def get_image(bdrc_scan_id,image_group_id):
         # format should be a list of image_id (/ file names)
         return map(lambda ii: ii["filename"], buda_il)
 
+def delete_obj_from_bucket(file_name):
+    res = S3_client.delete_object(Bucket="ocr.bdrc.io",Key = file_name)
+    print(res)
+
 if __name__ == "__main__":
     #df = read_csv("sample.csv")
     #prefix = get_s3_prefix_path("W1K2118","I1K2126")
     #archive_on_s3(prefix)
-    #S3_client.download_file(OCR_OUTPUT_BUCKET,f"s3://ocr.bdrc.io/Works/37/W4CZ1042/norbuketaka/batch-0001/info.json","demo.json")
+    objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
+    i=0
+    for file in objects:
+        print(i)
+        i+=1
+        #print(file.key)
+        #S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,f"{file.key}.csv")
+    #S3_client.download_file(OCR_OUTPUT_BUCKET,"Works/e6/W1KG2118/norbuketaka/batch-0001/W1KG2118-I1KG2126.csv","demo.json")
     #S3_client.download_file(OCR_OUTPUT_BUCKET,f"s3://ocr.bdrc.io/Works/37/W4CZ1042/norbuketaka/batch-0001/W4CZ1042-I1PD108815.csv","demo.csv")
     #extract_meta()
     #df = read_csv("08152022_queenieluo/W00EGS1016761-I01JW66.csv")
     #df.to_csv("new.csv")
-    image_list = get_image("W00EGS1016761","I01JW66")
+    #delete_obj_from_bucket("Works/e6/W1KG2118/norbuketaka/batch-0001/W1KG2118-I1KG2126.csv")
+    s3_ocr_csv_path = "Works/e6/W1KG2118/norbuketaka/batch-0001/W1KG2118-I1KG2126.csv"
+    csv_content = Path("W1KG2118-I1KG2126.csv").read_text(encoding="utf-8")
+    #ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content)
+    """ image_list = get_image("W00EGS1016761","I01JW66")
     for image_number, image_filename in enumerate(image_list):
-        print(image_number,image_filename)
+        print(image_number,image_filename) """
     
