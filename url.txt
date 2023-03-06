@@ -1,4 +1,3 @@
-Found credentials in shared credentials file: ~/.aws/credentials
 Works/a8/W4PD502/norbuketaka2/batch-0001/W4PD502-I4PD4095.csv
 Works/79/W1KG16455/norbuketaka2/batch-0001/W1KG16455-I1KG16457.csv
 Works/ba/W1KG16666/norbuketaka2/batch-0001/W1KG16666-I4PD2670.csv
