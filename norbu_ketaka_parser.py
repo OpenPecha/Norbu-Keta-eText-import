@@ -276,12 +276,10 @@ def set_up_logger(logger_name):
 def main():
     pechas_catalog = set_up_logger("pechas_catalog")
     obj = csvFormatter()
-    csv_files = get_csvFiles("08152022_queenieluo")
+    csv_files = get_csvFiles("NorbuKetaka2")
     #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
     col_priority = ["image_name","line_number"]
     for work_id in csv_files.keys():
-        if work_id != "W1KG2118":
-            continue
         opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
         assets = [Path(path) for path in csv_files[work_id]]
         if opf.is_private:
@@ -291,8 +289,9 @@ def main():
             print("repo is public")
             publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
         pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
+        break
 
-
+    
 if __name__ == "__main__":
     main()
     

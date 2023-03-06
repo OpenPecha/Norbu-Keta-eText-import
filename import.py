@@ -100,11 +100,11 @@ def delete_obj_from_bucket(file_name):
 if __name__ == "__main__":
     path = "NorbuKetaka2"
     csv_files = get_csvFiles(path)
-    for csv_file in csv_files:
+    """ for csv_file in csv_files:
         main(csv_file)
-        print(csv_file)
+        print(csv_file) """
 
-    """ objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
-    for file in objects:
-        S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,f"{file.key}.csv") """
-    
+    #objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
+    keys = Path("url.txt").read_text().splitlines()
+    for file in keys:
+        S3_client.download_file(OCR_OUTPUT_BUCKET,file,f"NorbuKetaka2/{Path(file).name}")
