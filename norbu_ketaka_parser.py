@@ -137,7 +137,7 @@ class csvFormatter(BaseFormatter):
                 "ocr_info":{
                     "timestamp":"2023-02-01T00:00:00Z"
                 },
-                "batch_id":"batch-0001",
+                "batch_id":"batch-0002",
                 "software_id":"norbuketaka",
                 "expected_default_language":"bo",
                 "op_import_options":None
@@ -147,7 +147,7 @@ class csvFormatter(BaseFormatter):
             source_file=None,
             initial_creation_type=InitialCreationType.ocr,
             imported=datetime.datetime.now(),
-            last_modified="2022-08-25T00:00:00Z",
+            last_modified="2023-02-01T00:00:00Z",
             parser= parser,
             source_metadata=source_metadata,
             quality=None,
@@ -289,7 +289,7 @@ def create_opfs(csv_files,col_priority):
                 publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
             pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
         except Exception as e:
-            err_log.info(e)
+            err_log.info(f"{e},{work_id}")
 
 
 def main():
