@@ -274,16 +274,7 @@ def create_opfs(csv_files,col_priority):
     pechas_catalog = set_up_logger("pechas_catalog")
     err_log = set_up_logger("err")
     for work_id in csv_files.keys():
-        opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
-        assets = [Path(path) for path in csv_files[work_id]]
-        if opf.is_private:
-            print("repo is private")
-            publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
-        else:
-            print("repo is public")
-            publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
-        pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
-        """ try:
+        try:
             opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
             assets = [Path(path) for path in csv_files[work_id]]
             if opf.is_private:
@@ -294,7 +285,7 @@ def create_opfs(csv_files,col_priority):
                 publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
             pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
         except Exception as e:
-            err_log.info(f"{e},{work_id}") """
+            err_log.info(f"{e},{work_id}")
 
 
 def main():
