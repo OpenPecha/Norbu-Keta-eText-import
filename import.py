@@ -104,8 +104,8 @@ if __name__ == "__main__":
         main(csv_file)
         print(csv_file) """
 
-    #objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
+    objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
     keys = Path("url.txt").read_text().splitlines()
-    for file in keys:
+    for file in objects:
         print(file)
-        S3_client.download_file(OCR_OUTPUT_BUCKET,file,f"NorbuKetaka2/{Path(file).name}")
+        S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,file.key)

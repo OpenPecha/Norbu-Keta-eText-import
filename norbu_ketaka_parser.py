@@ -135,7 +135,7 @@ class csvFormatter(BaseFormatter):
                 "bdrc_scan_id":work_id,
                 "source":"bdrc",
                 "ocr_info":{
-                    "timestamp":"2022-08-25T00:00:00Z"
+                    "timestamp":"2023-02-01T00:00:00Z"
                 },
                 "batch_id":"batch-0001",
                 "software_id":"norbuketaka",
@@ -273,24 +273,29 @@ def set_up_logger(logger_name):
     return logger
 
 
-def main():
-    pechas_catalog = set_up_logger("pechas_catalog")
+def create_opfs(csv_files,col_priority):
     obj = csvFormatter()
-    csv_files = get_csvFiles("NorbuKetaka2")
-    #csv_files = ["08152022_queenieluo/W4CZ1042-I1PD108816.csv","08152022_queenieluo/W4CZ1042-I1PD108817csv","08152022_queenieluo/W4CZ1042-I1PD108818.csv",]
-    col_priority = ["image_name","line_number"]
+    pechas_catalog = set_up_logger("pechas_catalog")
+    err_log = set_up_logger("err")
     for work_id in csv_files.keys():
-        opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
-        assets = [Path(path) for path in csv_files[work_id]]
-        if opf.is_private:
-            print("repo is private")
-            publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
-        else:
-            print("repo is public")
-            publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
-        pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
-        break
+        try:
+            opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
+            assets = [Path(path) for path in csv_files[work_id]]
+            if opf.is_private:
+                print("repo is private")
+                publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
+            else:
+                print("repo is public")
+                publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
+            pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
+        except Exception as e:
+            err_log.info(e)
 
+
+def main():
+    csv_files = get_csvFiles("NorbuKetaka2")
+    col_priority = ["image_name","line_number"]
+    create_opfs(csv_files,col_priority)
     
 if __name__ == "__main__":
     main()
