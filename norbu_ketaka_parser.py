@@ -10,6 +10,7 @@ from openpecha.buda.api import get_buda_scan_info,get_image_list
 from pathlib import Path
 from openpecha import config
 from openpecha import github_utils
+from pydantic import parse_obj_as, AnyHttpUrl
 import os
 import re
 import logging
@@ -109,7 +110,6 @@ class csvFormatter(BaseFormatter):
         self.title = ""
         index,row = list(self.csv_df.iterrows())[0]
         work_id = row["work_id"]
-        parser = """https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"""
         res = self.get_work_metadata(work_id)
         if res != None:  
             source_metadata = res["source_metadata"] 
@@ -148,7 +148,7 @@ class csvFormatter(BaseFormatter):
             initial_creation_type=InitialCreationType.ocr,
             imported=datetime.datetime.now(),
             last_modified="2023-02-01T00:00:00Z",
-            parser= parser,
+            parser= parse_obj_as(AnyHttpUrl,"https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"),
             source_metadata=source_metadata,
             quality=None,
             bases = bases,
