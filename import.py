@@ -49,7 +49,7 @@ def get_s3_prefix_path(
         for dt in data_types:
             paths[dt] = f"{batch_dir}/{dt}/{work_local_id}-{suffix}"
         return paths
-    return f"{base_dir}/norbuketaka2/batch-0001"
+    return f"{base_dir}/norbuketaka2/batch-0002"
 
 def get_info_json():
     info_json = {
@@ -62,8 +62,8 @@ def archive_on_s3(s3_path,csv_file:Path,file_name):
     csv_content = csv_file.read_text(encoding="utf-8")
     s3_ocr_info_path = f"{s3_path}/info.json"
     s3_ocr_csv_path = f"{s3_path}/{file_name}"
-    #ocr_output_bucket.put_object(Key=s3_ocr_info_path, Body=(bytes(json.dumps(info_json).encode("UTF-8"))))
-    #ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content)
+    ocr_output_bucket.put_object(Key=s3_ocr_info_path, Body=(bytes(json.dumps(info_json).encode("UTF-8"))))
+    ocr_output_bucket.put_object(Key=s3_ocr_csv_path,Body= csv_content)
     logging.info(s3_ocr_csv_path)
 
 def get_csvFiles(dir):
@@ -71,7 +71,7 @@ def get_csvFiles(dir):
     return csv_files
 
 def extract_ids(str):
-    x = re.match("(.*)-(.*)\.(csv)+",str)
+    x = re.match("(.*)-(.*)",str)
     work_id = x.group(1)
     image_group_id = x.group(2)
     return work_id,image_group_id
@@ -94,18 +94,22 @@ def get_image(bdrc_scan_id,image_group_id):
         return map(lambda ii: ii["filename"], buda_il)
 
 def delete_obj_from_bucket(file_name):
-    res = S3_client.delete_object(Bucket="ocr.bdrc.io",Key = file_name)
+    res = S3_client.delete_object(Bucket=OCR_OUTPUT_BUCKET,Key = file_name)
     print(res)
 
 if __name__ == "__main__":
     path = "NorbuKetaka2"
     csv_files = get_csvFiles(path)
-    """ for csv_file in csv_files:
+    for csv_file in csv_files:
         main(csv_file)
-        print(csv_file) """
+        print(csv_file)
 
-    objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
+
+    """ keys = Path("url.txt").read_text().splitlines()
+    for key in keys:
+        delete_obj_from_bucket(key) """
+    """ objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
     keys = Path("url.txt").read_text().splitlines()
     for file in objects:
         print(file)
-        S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,file.key)
+        S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,file.key) """
