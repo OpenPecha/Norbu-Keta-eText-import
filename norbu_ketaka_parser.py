@@ -228,7 +228,6 @@ def update_csv_hearders(csv_file):
     return mod_csv_path
 
 def publish_repo(pecha_path, asset_paths=None,private=False):
-    return
     repo = github_utils.github_publish(
         pecha_path,
         message="initial commit",
@@ -241,9 +240,6 @@ def publish_repo(pecha_path, asset_paths=None,private=False):
     if asset_paths:
         zipped_dir = create_zip_dir(asset_paths)
         repo_name = pecha_path.stem
-        #asset_name = asset_path.stem
-        #shutil.make_archive(asset_path.parent / asset_name, "zip", asset_path)
-        #asset_paths.append(f"{asset_path.parent / asset_name}.zip")
         github_utils.create_release(
             repo_name,
             prerelease=False,
