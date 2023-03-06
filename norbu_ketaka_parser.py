@@ -109,6 +109,7 @@ class csvFormatter(BaseFormatter):
         source_metadata = ""
         self.title = ""
         index,row = list(self.csv_df.iterrows())[0]
+        parser = "https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"
         work_id = row["work_id"]
         res = self.get_work_metadata(work_id)
         if res != None:  
@@ -148,7 +149,7 @@ class csvFormatter(BaseFormatter):
             initial_creation_type=InitialCreationType.ocr,
             imported=datetime.datetime.now(),
             last_modified="2023-02-01T00:00:00Z",
-            parser= parse_obj_as(AnyHttpUrl,"https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"),
+            parser= parser,
             source_metadata=source_metadata,
             quality=None,
             bases = bases,
