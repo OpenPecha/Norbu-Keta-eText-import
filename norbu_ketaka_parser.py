@@ -228,7 +228,7 @@ def update_csv_hearders(csv_file):
     return mod_csv_path
 
 def publish_repo(pecha_path, asset_paths=None,private=False):
-    repo = github_utils.github_publish(
+    remote_repo = github_utils.github_publish(
         pecha_path,
         message="initial commit",
         not_includes=[],
@@ -241,11 +241,12 @@ def publish_repo(pecha_path, asset_paths=None,private=False):
         zipped_dir = create_zip_dir(asset_paths)
         repo_name = pecha_path.stem
         github_utils.create_release(
-            repo_name,
+            repo_name=repo_name,
+            repo=remote_repo,
             prerelease=False,
             asset_paths=[zipped_dir], 
             org=os.environ.get("OPENPECHA_DATA_GITHUB_ORG"),
-            token=os.environ.get("GITHUB_TOKEN"),repo = repo
+            token=os.environ.get("GITHUB_TOKEN"),
         )
         os.remove("source.zip")
 
@@ -274,7 +275,16 @@ def create_opfs(csv_files,col_priority):
     pechas_catalog = set_up_logger("pechas_catalog")
     err_log = set_up_logger("err")
     for work_id in csv_files.keys():
-        try:
+        opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
+        assets = [Path(path) for path in csv_files[work_id]]
+        if opf.is_private:
+            print("repo is private")
+            publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
+        else:
+            print("repo is public")
+            publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
+        pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
+        """ try:
             opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
             assets = [Path(path) for path in csv_files[work_id]]
             if opf.is_private:
@@ -285,7 +295,7 @@ def create_opfs(csv_files,col_priority):
                 publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
             pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
         except Exception as e:
-            err_log.info(f"{e},{work_id}")
+            err_log.info(f"{e},{work_id}") """
 
 
 def main():
