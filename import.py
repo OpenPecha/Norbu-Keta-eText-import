@@ -49,7 +49,7 @@ def get_s3_prefix_path(
         for dt in data_types:
             paths[dt] = f"{batch_dir}/{dt}/{work_local_id}-{suffix}"
         return paths
-    return f"{base_dir}/norbuketaka2/batch-0002"
+    return f"{base_dir}/norbuketaka/batch-0002"
 
 def get_info_json():
     info_json = {
@@ -105,11 +105,14 @@ if __name__ == "__main__":
         print(csv_file)
 
 
-    """ keys = Path("url.txt").read_text().splitlines()
+    """ keys = Path("url.log.1").read_text().splitlines()
     for key in keys:
+        print(key)
         delete_obj_from_bucket(key) """
-    """ objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
-    keys = Path("url.txt").read_text().splitlines()
-    for file in objects:
-        print(file)
-        S3_client.download_file(OCR_OUTPUT_BUCKET,file.key,file.key) """
+    #objects = ocr_output_bucket.objects.filter(Prefix='NorbuKetaka2/')
+    #keys = Path("url.log.1").read_text().splitlines()
+    """ for file in keys:
+        file_name = Path(file).stem
+        work_id,image_group_id = extract_ids(file_name)
+        if work_id == "W1PD133161":
+            S3_client.download_file(OCR_OUTPUT_BUCKET,file,f"new_data/{file_name}.csv") """
