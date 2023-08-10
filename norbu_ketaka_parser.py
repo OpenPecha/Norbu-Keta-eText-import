@@ -274,9 +274,7 @@ def create_opfs(csv_files,col_priority):
     obj = csvFormatter()
     pechas_catalog = set_up_logger("pechas_catalog")
     err_log = set_up_logger("err")
-    work_ids = ["W1PD133164"]
     for work_id in csv_files.keys():
-        print(csv_files[work_id])
         opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
         assets = [Path(path) for path in csv_files[work_id]]
         if opf.is_private:
@@ -288,8 +286,8 @@ def create_opfs(csv_files,col_priority):
         pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
 
 
-def main():
-    csv_files = get_csvFiles("new_Data")
+def main(csv_files_path):
+    csv_files = get_csvFiles(csv_files_path)
     col_priority = ["image_name","line_number"]
     create_opfs(csv_files,col_priority)
     
