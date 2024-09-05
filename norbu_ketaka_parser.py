@@ -29,15 +29,41 @@ class csvFormatter(BaseFormatter):
             self.csv_df = self.read_csv()
 
     def read_csv(self,path):
-        mod_csv_path = update_csv_hearders(path)  
-        df = pd.read_csv(mod_csv_path)
+        df = pd.read_csv(path)
+        # fix for https://github.com/OpenPecha/Toolkit/issues/275
+        for index, row in df.iterrows():
+            volume_id = row['volume_ID']
+            page_id = row['page_ID']
+            
+            # Check if page_ID starts with volume_ID
+            if not page_id.startswith(volume_id):
+                logging.error(f"Page ID '{page_id}' does not start with Volume ID '{volume_id}' at row {index}.")
+                continue
+
+            # Remove the volume_ID from the start of page_ID to get the numeric part
+            numeric_part = page_id[len(volume_id):]
+            
+            # Check if the remaining part can be converted to an integer
+            try:
+                numeric_part_int = int(numeric_part)
+            except ValueError:
+                logging.warn(f"Page ID '{page_id}' has a non-integer part '{numeric_part}' at row {index}.")
+                continue
+
+            # Format the page_ID to be volume_ID + numeric part padded to 4 digits
+            updated_page_id = f"{volume_id}{numeric_part_int:04d}"
+            
+            # Update the dataframe with the new page_ID
+            df.at[index, 'page_ID'] = updated_page_id
+
+        df.sort_values(["page_ID","row_number"])
         return df
 
     def get_base_text(self):
         base_text = ""
-        prev_image_name = self.csv_df["image_name"].iloc[0]
+        prev_image_name = self.csv_df["page_ID"].iloc[0]
         for index,row in self.csv_df.iterrows():
-            cur_image_name = row["image_name"]
+            cur_image_name = row["page_ID"]
             if prev_image_name == cur_image_name:
                 line_text = "" if str(row["text"]) == "nan" else str(row["text"])
                 base_text+=line_text+"\n"
@@ -47,15 +73,10 @@ class csvFormatter(BaseFormatter):
             prev_image_name = cur_image_name
         return base_text
 
-    def order_df(self,col_priority_order):
-        self.csv_df = self.csv_df.sort_values(col_priority_order)
-
-
-
     def get_pagination_layer(self):
         page_annotations = {}
         char_walker=0
-        grouped = self.csv_df.groupby("image_name")
+        grouped = self.csv_df.groupby("page_ID")
         for name,df in grouped:
             page_annotation,char_walker= self.get_page_annotation(df,char_walker)
             page_annotations.update(page_annotation)
@@ -86,9 +107,9 @@ class csvFormatter(BaseFormatter):
 
     def get_image_meta(self,df):
         row = df.iloc[0]
-        work_id = row["work_id"]
-        image_group_id = row["image_group_id"]
-        image_name = str(row["image_name"])
+        work_id = row["text_ID"]
+        image_group_id = row["volume_ID"]
+        image_name = str(row["page_ID"])
         if (work_id,image_group_id) not in self.buda_il.keys():
             res = get_image_list(work_id, image_group_id)
             self.buda_il.update({(work_id,image_group_id):res})
@@ -97,7 +118,7 @@ class csvFormatter(BaseFormatter):
             buda_il = self.buda_il[(work_id,image_group_id)]
 
         for image_number, image_filename in enumerate(map(lambda ii: ii["filename"], buda_il)):
-            ex = re.match("(.*)\..*",image_filename)
+            ex = re.match(r"(.*)\..*",image_filename)
             if ex.group(1) == image_name:
                 return image_number+1,image_filename 
 
@@ -165,13 +186,11 @@ class csvFormatter(BaseFormatter):
         return meta
 
     
-    def create_opf(self,csv_files:list,col_priority_order:list=None):
+    def create_opf(self,csv_files:list):
         """
         Paramneters:
         csv_file: str
             csv file path to format
-        col_priority_order: list
-            list of col to priotize in descending order priority
         """
         pecha_id = get_initial_pecha_id()
         opf_path = f"opfs/{pecha_id}/{pecha_id}.opf"
@@ -180,12 +199,10 @@ class csvFormatter(BaseFormatter):
 
         for csv_file in csv_files:
             self.csv_df = self.read_csv(csv_file)
-            if col_priority_order:
-                self.order_df(col_priority_order)
             base_text = self.get_base_text()
             pagination_layer = self.get_pagination_layer()
             base_id = self.get_base_id()
-            if re.search('\d', str(base_id)[0]):
+            if re.search(r'\d', str(base_id)[0]):
                 base_id = f'I{base_id}' 
             opf.bases.update({base_id:base_text})
             opf.layers.update({base_id:{LayerEnum.pagination:pagination_layer}})
@@ -195,7 +212,6 @@ class csvFormatter(BaseFormatter):
         opf.save_layers()
         opf.save_meta()
         return opf
-
 
     def get_base_id(self):
         image_group_names = self.csv_df["image_group_id"].unique()
@@ -219,18 +235,6 @@ def get_csvFiles(dir):
         searched_works.add(work)
 
     return files
-
-def update_csv_hearders(csv_file):
-    df = pd.read_csv(csv_file)
-    correct_df = df.rename(columns={
-        "text_ID":"work_id",
-        "volume_ID":"image_group_id",
-        "page_ID":"image_name",
-        "row_number":"line_number"
-    })
-    mod_csv_path = f"{config.PECHAS_PATH}/{Path(csv_file).stem}.csv"
-    correct_df.to_csv(mod_csv_path, index=False,header=True)
-    return mod_csv_path
 
 def publish_repo(pecha_path, asset_paths=None,private=False):
     remote_repo = github_utils.github_publish(
@@ -275,12 +279,12 @@ def set_up_logger(logger_name):
     return logger
 
 
-def create_opfs(csv_files,col_priority):
+def create_opfs(csv_files):
     obj = csvFormatter()
     pechas_catalog = set_up_logger("pechas_catalog")
     err_log = set_up_logger("err")
     for work_id in csv_files.keys():
-        opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
+        opf = obj.create_opf(csv_files=csv_files[work_id])
         assets = [Path(path) for path in csv_files[work_id]]
         opf_git = OpenPechaGitRepo(opf.pecha_id, opf.opf_path)
         opf_git.publish()
@@ -293,10 +297,9 @@ def create_opfs(csv_files,col_priority):
         pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
 
 def create_opf(work_dir, csv_formatter):
-    col_priority = ["image_name","line_number"]
     csv_file_paths = list(Path(work_dir).iterdir())
     csv_file_paths.sort()
-    opf = csv_formatter.create_opf(csv_files=csv_file_paths, col_priority_order=col_priority)
+    opf = csv_formatter.create_opf(csv_files=csv_file_paths)
     # assets = Path(work_dir)
     # opf_git = OpenPechaGitRepo(opf.pecha_id, opf.opf_path)
     # opf_git.publish(asset_path=assets, asset_name='v0.1')
