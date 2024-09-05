@@ -1,6 +1,6 @@
 from openpecha.formatters import BaseFormatter
 import pandas as pd
-from openpecha.core.pecha import OpenPechaFS
+from openpecha.core.pecha import OpenPechaFS, OpenPechaGitRepo
 from openpecha.core.layer import Layer, LayerEnum
 from openpecha.core.annotation import AnnBase, Span,Page
 from uuid import uuid4
@@ -10,7 +10,7 @@ from openpecha.buda.api import get_buda_scan_info,get_image_list
 from pathlib import Path
 from openpecha import config
 from openpecha import github_utils
-from pydantic import parse_obj_as, AnyHttpUrl
+# from pydantic import parse_obj_as, AnyHttpUrl
 import os
 import re
 import logging
@@ -39,9 +39,11 @@ class csvFormatter(BaseFormatter):
         for index,row in self.csv_df.iterrows():
             cur_image_name = row["image_name"]
             if prev_image_name == cur_image_name:
-                base_text+=row["text"]+"\n"
+                line_text = "" if str(row["text"]) == "nan" else str(row["text"])
+                base_text+=line_text+"\n"
             else:
-                base_text+="\n"+row["text"]+"\n"
+                line_text = "" if str(row["text"]) == "nan" else str(row["text"])
+                base_text+=f"\n{line_text}\n"
             prev_image_name = cur_image_name
         return base_text
 
@@ -78,7 +80,8 @@ class csvFormatter(BaseFormatter):
     def convert_text_list_to_string(self,df):
         base_text = ""
         for _,row in df.iterrows():
-            base_text+=row["text"]+"\n"
+            line_text = "" if str(row["text"]) == "nan" else str(row["text"])
+            base_text+=line_text+"\n"
         return base_text[:-1]
 
     def get_image_meta(self,df):
@@ -182,6 +185,8 @@ class csvFormatter(BaseFormatter):
             base_text = self.get_base_text()
             pagination_layer = self.get_pagination_layer()
             base_id = self.get_base_id()
+            if re.search('\d', str(base_id)[0]):
+                base_id = f'I{base_id}' 
             opf.bases.update({base_id:base_text})
             opf.layers.update({base_id:{LayerEnum.pagination:pagination_layer}})
             base_ids.append(base_id)
@@ -277,20 +282,39 @@ def create_opfs(csv_files,col_priority):
     for work_id in csv_files.keys():
         opf = obj.create_opf(csv_files=csv_files[work_id],col_priority_order=col_priority)
         assets = [Path(path) for path in csv_files[work_id]]
-        if opf.is_private:
-            print("repo is private")
-            publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
-        else:
-            print("repo is public")
-            publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
+        opf_git = OpenPechaGitRepo(opf.pecha_id, opf.opf_path)
+        opf_git.publish()
+        # if opf.is_private:
+        #     print("repo is private")
+        #     publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
+        # else:
+        #     print("repo is public")
+        #     publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
         pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
 
-
-def main(csv_files_path):
-    csv_files = get_csvFiles(csv_files_path)
+def create_opf(work_dir, csv_formatter):
     col_priority = ["image_name","line_number"]
-    create_opfs(csv_files,col_priority)
+    csv_file_paths = list(Path(work_dir).iterdir())
+    csv_file_paths.sort()
+    opf = csv_formatter.create_opf(csv_files=csv_file_paths, col_priority_order=col_priority)
+    # assets = Path(work_dir)
+    # opf_git = OpenPechaGitRepo(opf.pecha_id, opf.opf_path)
+    # opf_git.publish(asset_path=assets, asset_name='v0.1')
+    return opf
+
     
 if __name__ == "__main__":
-    main()
+    csv_formatter = csvFormatter()
+    pechas_catalog = set_up_logger("pechas_catalog")
+    err_log = set_up_logger("err")
+    work_dirs = list(Path("./works").iterdir())
+    work_dirs.sort()
+    for work_dir in work_dirs:
+        work_id = work_dir.stem
+        try:
+            if work_id == "W1KG14505":
+                opf = create_opf(work_dir, csv_formatter)
+                pechas_catalog.info(f"{opf.pecha_id},{csv_formatter.title},{work_dir.stem}")
+        except:
+            err_log.info(f"Couldn't create {work_dir.stem}")
     
