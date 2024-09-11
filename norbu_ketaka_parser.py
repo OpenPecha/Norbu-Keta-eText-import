@@ -22,11 +22,9 @@ import shutil
 class csvFormatter(BaseFormatter):
     col_headers = ["work_id","image_group_id","text","image_name","line_number"]
 
-    def __init__(self,output_path=None,metadata=None,csv_file:str=None):
+    def __init__(self,output_path=None,metadata=None):
         self.buda_il = {}
         super().__init__(output_path,metadata)
-        if csv_file:
-            self.csv_df = self.read_csv()
 
     def read_csv(self,path):
         df = pd.read_csv(path)
@@ -127,15 +125,13 @@ class csvFormatter(BaseFormatter):
         res = get_buda_scan_info(work_id)
         return res
 
-    def get_meta(self,pecha_id,base_ids):
+    def get_meta(self,pecha_id,base_ids, wlname, batch_min):
         bases = {}
         order = 1
         source_metadata = ""
         self.title = ""
-        index,row = list(self.csv_df.iterrows())[0]
         parser = "https://github.com/OpenPecha/Norbu-Keta-eText-import/blob/main/norbu_ketaka_parser.py"
-        work_id = row["work_id"]
-        res = self.get_work_metadata(work_id)
+        res = get_buda_scan_info(wlname)
         if res != None:  
             source_metadata = res["source_metadata"] 
             self.title = res["source_metadata"]["title"]
@@ -157,12 +153,12 @@ class csvFormatter(BaseFormatter):
         meta = InitialPechaMetadata(
             id = pecha_id,
             ocr_import_info={
-                "bdrc_scan_id":work_id,
+                "bdrc_scan_id":wlname,
                 "source":"bdrc",
                 "ocr_info":{
                     "timestamp":"2023-02-01T00:00:00Z"
                 },
-                "batch_id":"batch-0002",
+                "batch_id":"batch-000"+str(batch_min),
                 "software_id":"norbuketaka",
                 "expected_default_language":"bo",
                 "op_import_options":None
@@ -186,32 +182,20 @@ class csvFormatter(BaseFormatter):
         return meta
 
     
-    def create_opf(self,csv_files:list):
-        """
-        Paramneters:
-        csv_file: str
-            csv file path to format
-        """
-        pecha_id = get_initial_pecha_id()
-        opf_path = f"opfs/{pecha_id}/{pecha_id}.opf"
-        opf = OpenPechaFS(path=opf_path)
+    def update_opf(self, opf, csv_to_iglname, wlname, batch_min, op_id):
         base_ids = []
-
-        for csv_file in csv_files:
+        for csv_file in csv_to_iglname:
+            iglname = csv_to_iglname[csv_file]
             self.csv_df = self.read_csv(csv_file)
             base_text = self.get_base_text()
-            pagination_layer = self.get_pagination_layer()
-            base_id = self.get_base_id()
-            if re.search(r'\d', str(base_id)[0]):
-                base_id = f'I{base_id}' 
-            opf.bases.update({base_id:base_text})
-            opf.layers.update({base_id:{LayerEnum.pagination:pagination_layer}})
-            base_ids.append(base_id)
-        opf._meta = self.get_meta(pecha_id,base_ids)
+            pagination_layer = self.get_pagination_layer() 
+            opf.bases.update({iglname:base_text})
+            opf.layers.update({iglname:{LayerEnum.pagination:pagination_layer}})
+            base_ids.append(iglname)
+        opf._meta = self.get_meta(op_id, base_ids, wlname, batch_min)
         opf.save_base()
         opf.save_layers()
         opf.save_meta()
-        return opf
 
     def get_base_id(self):
         image_group_names = self.csv_df["image_group_id"].unique()
@@ -246,38 +230,6 @@ def publish_repo(pecha_path, asset_paths=None,private=False):
         token=os.environ.get("GITHUB_TOKEN"),
         private=private
        )
-    if asset_paths:
-        zipped_dir = create_zip_dir(asset_paths)
-        repo_name = pecha_path.stem
-        github_utils.create_release(
-            repo_name=repo_name,
-            repo=remote_repo,
-            prerelease=False,
-            asset_paths=[zipped_dir], 
-            org=os.environ.get("OPENPECHA_DATA_GITHUB_ORG"),
-            token=os.environ.get("GITHUB_TOKEN"),
-        )
-        os.remove("source.zip")
-
-def create_zip_dir(paths:Path):
-    os.makedirs("./source_files")
-    for path in paths:
-        shutil.copy(path.as_posix(),"./source_files")
-    shutil.make_archive("source",'zip',"./source_files")
-    shutil.rmtree("./source_files")
-    return Path("source.zip")
-
-
-
-def set_up_logger(logger_name):
-    logger = logging.getLogger(logger_name)
-    formatter = logging.Formatter("%(message)s")
-    fileHandler = logging.FileHandler(f"{logger_name}.log")
-    fileHandler.setFormatter(formatter)
-    logger.setLevel(logging.INFO)
-    logger.addHandler(fileHandler)
-    return logger
-
 
 def create_opfs(csv_files):
     obj = csvFormatter()
@@ -288,13 +240,7 @@ def create_opfs(csv_files):
         assets = [Path(path) for path in csv_files[work_id]]
         opf_git = OpenPechaGitRepo(opf.pecha_id, opf.opf_path)
         opf_git.publish()
-        # if opf.is_private:
-        #     print("repo is private")
-        #     publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
-        # else:
-        #     print("repo is public")
-        #     publish_repo(pecha_path=opf.opf_path.parent,private=False,asset_paths=assets)
-        pechas_catalog.info(f"{opf.pecha_id},{obj.title},{work_id}")
+        publish_repo(pecha_path=opf.opf_path.parent,private=True,asset_paths=assets)
 
 def create_opf(work_dir, csv_formatter):
     csv_file_paths = list(Path(work_dir).iterdir())
