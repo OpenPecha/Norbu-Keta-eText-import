@@ -22,10 +22,15 @@ def import_w(wlname, csv_to_iglname, batch_num, opf_id):
         cached_op_git.release()
     except:
         op OpenPechaGitRepo(opf_id, GIT_CACHE_FOLDER)
-    FORMATTER.update_opf(op, csv_to_iglname, wlname, batch_num, opf_id)
-    opf.save_base()
-    opf.save_layers()
-    opf.save_meta()
+    try:
+        FORMATTER.update_opf(op, csv_to_iglname, wlname, batch_num, opf_id)
+        opf.save_base()
+        opf.save_layers()
+        opf.save_meta()
+    except Exception as e:
+        logging.error("exception in "+wlname)
+        logging.error(traceback.format_exc())
+
 
 def import_db(db_path):
     with open(db_path, newline='') as csvfile:
