@@ -8,13 +8,12 @@ TOKEN = os.getenv("GITHUB_TOKEN")
 GIT_CACHE_FOLDER = Path("./cache/git_cache")
 GIT_PULL = False
 ORG_NAME = "Openpecha-data"
-GIT_CACHE_BARE = True
 
 FORMATTER = csvFormatter()
 
 def import_w(wlname, csv_to_iglname, batch_num, opf_id):
     # download opf and read it:
-    cached_op_git = OpenpechaCachedGit(opf_id, github_org=ORG_NAME, github_token=TOKEN, bare=GIT_CACHE_BARE, cache_dir_path=GIT_CACHE_FOLDER)
+    cached_op_git = OpenpechaCachedGit(opf_id, github_org=ORG_NAME, github_token=TOKEN, bare=False, cache_dir_path=GIT_CACHE_FOLDER)
     git_rev = cached_op_git.get_local_latest_commit(dst_sync=GIT_PULL)
     op = cached_op_git.get_openpecha(git_rev)
     cached_op_git.release()

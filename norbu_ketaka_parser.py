@@ -1,7 +1,7 @@
 from openpecha.formatters import BaseFormatter
 import pandas as pd
 from openpecha.core.pecha import OpenPechaFS, OpenPechaGitRepo
-from openpecha.core.layer import Layer, LayerEnum
+from openpecha.core.layer import Layer, LayerEnum, PechaMetadata, SpanINFO
 from openpecha.core.annotation import AnnBase, Span,Page
 from uuid import uuid4
 from openpecha.core.ids import get_initial_pecha_id
@@ -32,6 +32,10 @@ class csvFormatter(BaseFormatter):
         for index, row in df.iterrows():
             volume_id = row['volume_ID']
             page_id = row['page_ID']
+
+            pre, rest = volume_id[0], volume_id[1:]
+            if pre == 'I' and rest.isdigit() and len(rest) == 4:
+                volume_id = rest
             
             # Check if page_ID starts with volume_ID
             if not page_id.startswith(volume_id):
@@ -71,54 +75,70 @@ class csvFormatter(BaseFormatter):
             prev_image_name = cur_image_name
         return base_text
 
-    def get_pagination_layer(self):
-        page_annotations = {}
+    def get_pagination_layer(self, page_annotations, wlname, ilname):
+        spantoannoid = {}
+        for annid, ann in page_annotations.items():
+            spantoannoid[str(ann["span"]["start"])+":"+str(ann["span"]["end"])] = annid
         char_walker=0
         grouped = self.csv_df.groupby("page_ID")
         for name,df in grouped:
-            page_annotation,char_walker= self.get_page_annotation(df,char_walker)
-            page_annotations.update(page_annotation)
+            page_annotation,char_walker= self.get_page_annotation(df,wlname, ilname, char_walker)
+            span = str(page_annotation.span.start)+":"+str(page_annotation.span.end)
+            annid = spantoannoid[span] if span in spantoannoid else uuid4().hex
+            page_annotations[annid] = page_annotation
         segment_layer = Layer(annotation_type=LayerEnum.pagination,annotations=page_annotations)
         return segment_layer
     
     
-    def get_page_annotation(self,df,char_walker):
+    def get_page_annotation(self,df,wlname, ilname, char_walker):
         start = char_walker
-        try:
-            res = self.get_image_meta(df)
-            image_number,image_filename = res
-        except:
-            image_number,image_filename = None,None
-
-        base_text = self.convert_text_list_to_string(df)
-        end = char_walker + len(base_text)
-        page_annotation = {uuid4().hex:Page(span=Span(start=start,end=end),imgnum=image_number,reference=image_filename)}
-        return page_annotation,end+2
+        image_number,image_filename = self.get_image_meta(df, wlname, ilname)
+        base_text_len = self.convert_text_list_to_string_len(df)
+        end = char_walker + base_text_len
+        p = Page(span=Span(start=start,end=end),imgnum=image_number,reference=image_filename)
+        return p,end+2
 
 
-    def convert_text_list_to_string(self,df):
-        base_text = ""
+    def convert_text_list_to_string_len(self,df):
+        res = 0
         for _,row in df.iterrows():
-            line_text = "" if str(row["text"]) == "nan" else str(row["text"])
-            base_text+=line_text+"\n"
-        return base_text[:-1]
+            res += 1 if str(row["text"]) == "nan" else len(row["text"])+1
+        return res-1
 
-    def get_image_meta(self,df):
+    def get_image_meta(self,df, wlname, ilname):
         row = df.iloc[0]
-        work_id = row["text_ID"]
-        image_group_id = row["volume_ID"]
         image_name = str(row["page_ID"])
-        if (work_id,image_group_id) not in self.buda_il.keys():
-            res = get_image_list(work_id, image_group_id)
-            self.buda_il.update({(work_id,image_group_id):res})
+        if (wlname,ilname) not in self.buda_il.keys():
+            res = get_image_list(wlname, ilname)
+            self.buda_il.update({(wlname,ilname):res})
             buda_il = res
         else:
-            buda_il = self.buda_il[(work_id,image_group_id)]
+            buda_il = self.buda_il[(wlname,ilname)]
+
+        pre, rest = ilname[0], ilname[1:]
+        imgprefix = ilname
+        if pre == 'I' and rest.isdigit() and len(rest) == 4:
+            imgprefix = rest
+        
+
+        # Remove the volume_ID from the start of page_ID to get the numeric part
+        numeric_part = image_name[len(imgprefix):]
+
+        updated_image_name = image_name
+        
+        # Check if the remaining part can be converted to an integer
+        try:
+            numeric_part_int = int(numeric_part)
+            # Format the page_ID to be volume_ID + numeric part padded to 4 digits
+            updated_image_name = f"{imgprefix}{numeric_part_int:04d}"
+        except ValueError:
+            logging.warn(f"Page ID '{page_id}' has a non-integer part '{numeric_part}' at row {index}.")
 
         for image_number, image_filename in enumerate(map(lambda ii: ii["filename"], buda_il)):
             ex = re.match(r"(.*)\..*",image_filename)
-            if ex.group(1) == image_name:
-                return image_number+1,image_filename 
+            if ex.group(1) in [image_name, updated_image_name]:
+                return image_number+1,image_filename
+        return None, None
 
 
     def get_work_metadata(self,work_id):
@@ -188,7 +208,8 @@ class csvFormatter(BaseFormatter):
             iglname = csv_to_iglname[csv_file]
             self.csv_df = self.read_csv(csv_file)
             base_text = self.get_base_text()
-            pagination_layer = self.get_pagination_layer() 
+            layer = opf.get_layer(iglname, LayerEnum.pagination)
+            pagination_layer = self.get_pagination_layer(layer.annotations if layer is not None else {}, wlname, iglname) 
             opf.bases.update({iglname:base_text})
             opf.layers.update({iglname:{LayerEnum.pagination:pagination_layer}})
             base_ids.append(iglname)
