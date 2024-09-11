@@ -220,9 +220,6 @@ class csvFormatter(BaseFormatter):
             opf.layers.update({iglname:{LayerEnum.pagination:pagination_layer}})
             base_ids.append(iglname)
         opf._meta = self.get_meta(op_id, base_ids, wlname, batch_min)
-        opf.save_base()
-        opf.save_layers()
-        opf.save_meta()
 
     def get_base_id(self):
         image_group_names = self.csv_df["image_group_id"].unique()

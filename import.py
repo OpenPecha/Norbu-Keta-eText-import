@@ -15,10 +15,17 @@ FORMATTER = csvFormatter()
 def import_w(wlname, csv_to_iglname, batch_num, opf_id):
     # download opf and read it:
     cached_op_git = OpenpechaCachedGit(opf_id, github_org=ORG_NAME, github_token=TOKEN, bare=False, cache_dir_path=GIT_CACHE_FOLDER)
-    git_rev = cached_op_git.get_local_latest_commit(dst_sync=GIT_PULL)
-    op = cached_op_git.get_openpecha(git_rev)
-    cached_op_git.release()
+    op = None
+    try:
+        git_rev = cached_op_git.get_local_latest_commit(dst_sync=GIT_PULL)
+        op = cached_op_git.get_openpecha(git_rev)
+        cached_op_git.release()
+    except:
+        op OpenPechaGitRepo(opf_id, GIT_CACHE_FOLDER)
     FORMATTER.update_opf(op, csv_to_iglname, wlname, batch_num, opf_id)
+    opf.save_base()
+    opf.save_layers()
+    opf.save_meta()
 
 def import_db(db_path):
     with open(db_path, newline='') as csvfile:
