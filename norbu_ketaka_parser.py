@@ -27,7 +27,7 @@ class csvFormatter(BaseFormatter):
         super().__init__(output_path,metadata)
 
     def read_csv(self,path):
-        df = pd.read_csv(path)
+        df = pd.read_csv(path, dtype=str)
         # fix for https://github.com/OpenPecha/Toolkit/issues/275
         for index, row in df.iterrows():
             volume_id = str(row['volume_ID'])
