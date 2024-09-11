@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from tqdm import tqdm
 import logging
+from openpecha.core.pecha import OpenPechaGitRepo, OpenPechaFS
 
 TOKEN = os.getenv("GITHUB_TOKEN")
 GIT_CACHE_FOLDER = Path("./cache/git_cache")
@@ -22,15 +23,15 @@ def import_w(wlname, csv_to_iglname, batch_num, opf_id):
         op = cached_op_git.get_openpecha(git_rev)
         cached_op_git.release()
     except:
-        op OpenPechaGitRepo(opf_id, GIT_CACHE_FOLDER)
+        logging.info("create local repo for "+wlname)
+        op = OpenPechaFS(opf_id, GIT_CACHE_FOLDER)
     try:
         FORMATTER.update_opf(op, csv_to_iglname, wlname, batch_num, opf_id)
-        opf.save_base()
-        opf.save_layers()
-        opf.save_meta()
-    except Exception as e:
-        logging.error("exception in "+wlname)
-        logging.error(traceback.format_exc())
+        op.save_base()
+        op.save_layers()
+        op.save_meta()
+    except:
+        logging.exception("exception in "+wlname)
 
 
 def import_db(db_path):
