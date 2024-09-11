@@ -31,7 +31,9 @@ class csvFormatter(BaseFormatter):
         # fix for https://github.com/OpenPecha/Toolkit/issues/275
         for index, row in df.iterrows():
             volume_id = str(row['volume_ID'])
-            page_id = str(row['page_ID'])
+            page_id = str(row['page_ID']).replace(" ", "").replace("I1K1", "I1KG1")
+            if page_id.endswith(".0"):
+                page_id = page_id[:-2]
 
             pre, rest = volume_id[0], volume_id[1:]
             if pre == 'I' and rest.isdigit() and len(rest) == 4:
