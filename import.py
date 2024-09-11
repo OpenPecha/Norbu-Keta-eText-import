@@ -4,6 +4,7 @@ from cached_git_repo import OpenpechaCachedGit
 import os
 from pathlib import Path
 from tqdm import tqdm
+import logging
 
 TOKEN = os.getenv("GITHUB_TOKEN")
 GIT_CACHE_FOLDER = Path("./cache/git_cache")
