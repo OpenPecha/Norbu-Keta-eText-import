@@ -3,6 +3,7 @@ from norbu_ketaka_parser import csvFormatter
 from cached_git_repo import OpenpechaCachedGit
 import os
 from pathlib import Path
+from tqdm import tqdm
 
 TOKEN = os.getenv("GITHUB_TOKEN")
 GIT_CACHE_FOLDER = Path("./cache/git_cache")
@@ -26,7 +27,10 @@ def import_db(db_path):
         cur_op = None
         csv_to_iglname = None
         min_batch_num = 99
+        rows = []
         for row in reader:
+            rows.append(row)
+        for row in tqdm(rows):
             if cur_w != row[1]:
                 if cur_w is not None:
                     import_w(cur_w, csv_to_iglname, min_batch_num, cur_op)
@@ -34,8 +38,8 @@ def import_db(db_path):
                 cur_op = row[4]
                 min_batch_num = min(min_batch_num, int(row[3]))
                 csv_to_iglname = {}
-            csv_to_iglname[row[0]] = row[2]
+            csv_to_iglname["batch"+row[3]+"/"+row[0]] = row[2]
         import_w(cur_w, csv_to_iglname, min_batch_num, cur_op)
 
 if __name__ == "__main__":
-    import_db("dbtest.csv")
+    import_db("db.csv")

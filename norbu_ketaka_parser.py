@@ -30,8 +30,8 @@ class csvFormatter(BaseFormatter):
         df = pd.read_csv(path)
         # fix for https://github.com/OpenPecha/Toolkit/issues/275
         for index, row in df.iterrows():
-            volume_id = row['volume_ID']
-            page_id = row['page_ID']
+            volume_id = str(row['volume_ID'])
+            page_id = str(row['page_ID'])
 
             pre, rest = volume_id[0], volume_id[1:]
             if pre == 'I' and rest.isdigit() and len(rest) == 4:
