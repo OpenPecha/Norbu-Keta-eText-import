@@ -27,7 +27,7 @@ class csvFormatter(BaseFormatter):
         super().__init__(output_path,metadata)
 
     def read_csv(self,path):
-        df = pd.read_csv(path, dtype=str)
+        df = pd.read_csv(path, dtype=str, na_filter=False)
         # fix for https://github.com/OpenPecha/Toolkit/issues/275
         for index, row in df.iterrows():
             volume_id = str(row['volume_ID'])
@@ -114,6 +114,10 @@ class csvFormatter(BaseFormatter):
             buda_il = res
         else:
             buda_il = self.buda_il[(wlname,ilname)]
+
+        if not buda_il:
+            logging.error("cannot find il for %s" % ilname)
+            return None, None
 
         pre, rest = ilname[0], ilname[1:]
         imgprefix = ilname
