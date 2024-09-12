@@ -6,6 +6,7 @@ from pathlib import Path
 from tqdm import tqdm
 import logging
 from openpecha.core.pecha import OpenPechaGitRepo, OpenPechaFS
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 TOKEN = os.getenv("GITHUB_TOKEN")
 GIT_CACHE_FOLDER = Path("./cache/git_cache")
@@ -49,22 +50,42 @@ def import_db(db_path):
         seen_iglnames = []
         min_batch_num = 99
         rows = []
+        # Collect all rows first
         for row in reader:
             rows.append(row)
-        for row in tqdm(rows):
-            if cur_w != row[1]:
-                if cur_w is not None:
-                    import_w(cur_w, csv_to_iglname, min_batch_num, cur_op)
-                cur_w = row[1]
-                cur_op = row[4]
-                min_batch_num = min(min_batch_num, int(row[3]))
-                csv_to_iglname = {}
-                seen_iglnames = []
-            if row[2] in seen_iglnames:
-                logging.error(row[2]+" appears multiple times")
-            else:
-                csv_to_iglname["batch"+row[3]+"/"+row[0]] = row[2]
-        import_w(cur_w, csv_to_iglname, min_batch_num, cur_op)
+        
+        # Use ProcessPoolExecutor with max 4 processes
+        with ProcessPoolExecutor(max_workers=4) as executor:
+            futures = []
+            for row in tqdm(rows):
+                if cur_w != row[1]:
+                    if cur_w is not None:
+                        # Submit the import_w function to the executor
+                        futures.append(
+                            executor.submit(import_w, cur_w, csv_to_iglname, min_batch_num, cur_op)
+                        )
+                    cur_w = row[1]
+                    cur_op = row[4]
+                    min_batch_num = min(min_batch_num, int(row[3]))
+                    csv_to_iglname = {}
+                    seen_iglnames = []
+                if row[2] in seen_iglnames:
+                    logging.error(row[2]+" appears multiple times")
+                else:
+                    csv_to_iglname["batch"+row[3]+"/"+row[0]] = row[2]
+            
+            # Submit the last batch for processing
+            futures.append(
+                executor.submit(import_w, cur_w, csv_to_iglname, min_batch_num, cur_op)
+            )
+
+            # Ensure all tasks are completed
+            for future in as_completed(futures):
+                try:
+                    future.result()  # Retrieve any exceptions raised in the parallel tasks
+                except Exception as e:
+                    logging.error(f"Error in import_w: {e}")
+
 
 if __name__ == "__main__":
     import_db("db.csv")
