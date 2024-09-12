@@ -161,8 +161,8 @@ class csvFormatter(BaseFormatter):
         if res != None:  
             source_metadata = res["source_metadata"] 
             self.title = res["source_metadata"]["title"]
-
-            for base_id in base_ids:
+            sorted_base_ids = sorted(base_ids, key=lambda base_id: res["image_groups"][base_id]["volume_number"])
+            for base_id in sorted_base_ids:
                 bases.update({base_id:{
                         "source_metadata":{
                             "id":f"http://purl.bdrc.io/resource/{base_id}",
