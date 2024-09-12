@@ -51,7 +51,7 @@ class csvFormatter(BaseFormatter):
             try:
                 numeric_part_int = int(numeric_part)
             except ValueError:
-                logging.warn(f"Page ID '{page_id}' has a non-integer part '{numeric_part}' at row {index}.")
+                #logging.warn(f"Page ID '"+page_id+"' has a non-integer part")
                 continue
 
             # Format the page_ID to be volume_ID + numeric part padded to 4 digits

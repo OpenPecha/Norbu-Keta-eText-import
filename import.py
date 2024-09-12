@@ -40,6 +40,7 @@ def import_db(db_path):
         cur_w = None
         cur_op = None
         csv_to_iglname = None
+        seen_iglnames = []
         min_batch_num = 99
         rows = []
         for row in reader:
@@ -52,7 +53,11 @@ def import_db(db_path):
                 cur_op = row[4]
                 min_batch_num = min(min_batch_num, int(row[3]))
                 csv_to_iglname = {}
-            csv_to_iglname["batch"+row[3]+"/"+row[0]] = row[2]
+                seen_iglnames = []
+            if row[2] in seen_iglnames:
+                logging.error(row[2]+" appears multiple times")
+            else:
+                csv_to_iglname["batch"+row[3]+"/"+row[0]] = row[2]
         import_w(cur_w, csv_to_iglname, min_batch_num, cur_op)
 
 if __name__ == "__main__":
