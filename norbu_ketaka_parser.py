@@ -60,7 +60,7 @@ class csvFormatter(BaseFormatter):
             # Update the dataframe with the new page_ID
             df.at[index, 'page_ID'] = updated_page_id
 
-        df.sort_values(["page_ID","row_number"])
+        df.sort_values(["page_ID","row_number"], inplace=True)
         return df
 
     def get_base_text(self):
