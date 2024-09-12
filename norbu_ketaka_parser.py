@@ -138,7 +138,7 @@ class csvFormatter(BaseFormatter):
             # Format the page_ID to be volume_ID + numeric part padded to 4 digits
             updated_image_name = f"{imgprefix}{numeric_part_int:04d}"
         except ValueError:
-            logging.warn(f"Page ID '{page_id}' has a non-integer part '{numeric_part}' at row {index}.")
+            logging.warn(f"Page ID '{image_name}' has a non-integer part")
 
         for image_number, image_filename in enumerate(map(lambda ii: ii["filename"], buda_il)):
             ex = re.match(r"(.*)\..*",image_filename)
