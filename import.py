@@ -22,6 +22,9 @@ def import_w(wlname, csv_to_iglname, batch_num, opf_id):
         git_rev = cached_op_git.get_local_latest_commit(dst_sync=GIT_PULL)
         op = cached_op_git.get_openpecha(git_rev)
         cached_op_git.release()
+    except KeyboardInterrupt:
+        sys.exit()
+        pass
     except:
         logging.info("create local repo for "+wlname)
         op = OpenPechaFS(opf_id, GIT_CACHE_FOLDER)
@@ -30,6 +33,9 @@ def import_w(wlname, csv_to_iglname, batch_num, opf_id):
         op.save_base()
         op.save_layers()
         op.save_meta()
+    except KeyboardInterrupt:
+        sys.exit()
+        pass
     except:
         logging.exception("exception in "+wlname)
 
